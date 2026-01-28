@@ -1,0 +1,15 @@
+#CRC Codes for initially generated config files -- do not modify!
+SEGGER_RTT_Conf.h=-96194652
+btl_spi_controller_usart_driver_cfg.h=-411298478
+btl_spiflash_storage_cfg.h=254787522
+btl_storage_slot_cfg.h=1725980385
+dmadrv_config.h=1207334949
+sl_debug_swo_config.h=712797333
+sl_device_init_emu_config.h=622680131
+sl_emlib_gpio_init_pin0_config.h=1601723991
+sl_i2cspm_I2C0_config.h=-1187251364
+sl_i2cspm_I2C1_config.h=-1723157061
+sl_i2cspm_inst_config.h=2089882595
+sl_spidrv_inst_config.h=-539237058
+sl_storage_config.h=-1457561101
+spidrv_config.h=112055036

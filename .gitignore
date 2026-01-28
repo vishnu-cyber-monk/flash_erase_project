@@ -1,0 +1,26 @@
+# Build directories
+GNU ARM v12.2.1 - Default/
+build/
+cmake_gcc/build/
+
+# SDK directories (too large, should be installed separately)
+simplicity_sdk_*/
+
+# Backup files
+*.bak
+
+# IDE/Editor files
+.vscode/
+*.log
+vscode.conf
+
+# Trashed files
+trashed_modified_files/
+
+# Generated files
+*.pyc
+__pycache__/
+
+# OS files
+.DS_Store
+Thumbs.db
