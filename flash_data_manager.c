@@ -160,7 +160,8 @@ void flash_data_manager_init(void)
  ******************************************************************************/
 static void write_header_to_flash(void)
 {
-    if (g_initialized) return;
+    /* FIX: Was inverted - should return if NOT initialized */
+    if (!g_initialized) return;
 
     g_header.crc32 = 0; // CRC calculation would go here if implemented
     flash_erase_sector(FLASH_HEADER_ADDR);
@@ -227,10 +228,31 @@ bool flash_data_manager_erase_all(void) {
     if (!g_initialized) return false;
     printf("Flash Data Manager: ERASING ALL DATA...\n");
 
-    for(uint32_t erase_address=FLASH_HEADER_ADDR; erase_address < FLASH_DATA_END; erase_address +=0x10000){
-        flash_erase_block(erase_address);
-        printf("Erasing 64Kb at 0x%x\n", (uint32_t)erase_address);
+    /* Erase all 64KB blocks */
+    for(uint32_t erase_address = FLASH_HEADER_ADDR; erase_address < FLASH_DATA_END; erase_address += 0x10000){
+        flash_driver_status_t status = flash_erase_block(erase_address);
+        if (status != FLASH_DRIVER_OK) {
+            printf("ERROR: Erase failed at 0x%x (status=%d)\n", (uint32_t)erase_address, status);
+            return false;
+        }
+        printf("Erased 64Kb at 0x%x\n", (uint32_t)erase_address);
     }
-    printf("Erasing Done\n");
+
+    /* Reset header to initial state */
+    memset(&g_header, 0, sizeof(flash_header_t));
+    g_header.magic = 0xDEADBEEF;
+    g_header.version = 1;
+    g_header.write_pointer = FLASH_DATA_START;
+    g_header.read_pointer = FLASH_DATA_START;
+    g_header.oldest_pointer = FLASH_DATA_START;
+
+    /* Write fresh header to flash */
+    write_header_to_flash();
+
+    /* Reset current block state */
+    memset(&g_current_block, 0, sizeof(flash_data_block_t));
+    g_sample_index = 0;
+
+    printf("Erasing Done - Header reinitialized\n");
     return true;
 }

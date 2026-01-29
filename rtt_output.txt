@@ -1,0 +1,5 @@
+RTT successfully initialized.
+RTT read buffer 'Terminal' found.
+RTT write buffer at index 0 found, but could not resolve buffer name.
+ERROR: Could not retrieve RTT block info from JLink.
+DONE
