@@ -626,6 +626,50 @@ SL_WEAK void app_init(void)
 
   printf("\r\n");
   printf("########################################################\r\n");
+
+  //==========================================================================
+  // FLASH MEMORY DUMP - Read contents at key addresses
+  //==========================================================================
+  printf("\r\n");
+  printf("########################################################\r\n");
+  printf("#              FLASH MEMORY DUMP                       #\r\n");
+  printf("########################################################\r\n");
+
+  uint8_t dump_buf[256];
+  uint32_t dump_addresses[] = {
+      0x00000000,   // Start of flash
+      0x00010000,   // 64KB - Test 2 sector erase area
+      0x00020000,   // 128KB - Test 3 write area
+      0x00030000,   // 192KB - Test 4 block erase area
+      0x00040000,   // 256KB - Test 6 page write area
+      0x00100000,   // 1MB - Test 5 high address
+      0x01000000,   // 16MB - Test 5 high address
+      0x02000000,   // 32MB - Test 5 high address
+      0x03000000,   // 48MB - Test 5 high address
+  };
+  int num_dumps = sizeof(dump_addresses) / sizeof(dump_addresses[0]);
+
+  for (int d = 0; d < num_dumps; d++) {
+      uint32_t addr = dump_addresses[d];
+      printf("\r\n--- Address 0x%08lX ---\r\n", (unsigned long)addr);
+
+      // Read 64 bytes at this address
+      memset(dump_buf, 0, 64);
+      flash_read(addr, dump_buf, 64);
+
+      // Print in hex dump format
+      for (int row = 0; row < 4; row++) {
+          printf("  %08lX: ", (unsigned long)(addr + row * 16));
+          for (int col = 0; col < 16; col++) {
+              printf("%02X ", dump_buf[row * 16 + col]);
+          }
+          printf("\r\n");
+      }
+  }
+
+  printf("\r\n########################################################\r\n");
+  printf("#            END OF FLASH DUMP                         #\r\n");
+  printf("########################################################\r\n");
 }
 
 /**************************************************************************//**
