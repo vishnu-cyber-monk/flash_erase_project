@@ -257,144 +257,375 @@ SL_WEAK void app_init(void)
   #endif
 
   // Initialize flash driver
-  printf("\n\n====================================================\n");
-  printf("       FLASH ERASE & READOUT TEST\n");
-  printf("====================================================\n");
+  printf("\r\n\r\n");
+  printf("########################################################\r\n");
+  printf("#   EXTERNAL SPI FLASH (ISSI 64MB) - FULL TEST SUITE   #\r\n");
+  printf("########################################################\r\n");
 
-  flash_driver_status_t init_status = flash_driver_init();
-  printf("Flash driver init: %s\n", init_status == FLASH_DRIVER_OK ? "OK" : "FAILED");
+  flash_driver_status_t status;
+  int test_num = 0;
+  int tests_passed = 0;
+  int tests_failed = 0;
 
-  if (init_status != FLASH_DRIVER_OK) {
-      printf("ERROR: Flash init failed, aborting test\n");
+  //==========================================================================
+  // INITIALIZATION
+  //==========================================================================
+  printf("\r\n[INIT] Initializing flash driver...\r\n");
+  status = flash_driver_init();
+  if (status != FLASH_DRIVER_OK) {
+      printf("[INIT] FATAL: Flash driver init failed (status=%d)\r\n", status);
+      printf("[INIT] Check SPI connections and JEDEC ID\r\n");
       return;
   }
+  printf("[INIT] Flash driver initialized successfully\r\n");
 
   //==========================================================================
-  // TEST 1: Read header area to check current state
+  // TEST 1: BASIC READ TEST
   //==========================================================================
-  printf("\n--- TEST 1: Read Header Area (0x00000000) ---\n");
-  uint8_t header_data[32];
-  flash_read(0x00000000, header_data, 32);
-  printf("Header: ");
-  for(int i = 0; i < 32; i++) printf("%02X ", header_data[i]);
-  printf("\n");
+  test_num++;
+  printf("\r\n========================================\r\n");
+  printf("TEST %d: BASIC READ OPERATION\r\n", test_num);
+  printf("========================================\r\n");
 
-  //==========================================================================
-  // TEST 2: Erase and verify ONE block at test address
-  // Using internal flash data area (0x00060000 - 0x0007FFFF)
-  //==========================================================================
-  uint32_t test_addr = 0x00060000;  // Internal flash data storage area
-  uint8_t data_before[64];
-  uint8_t data_after[64];
+  uint8_t read_buf[32];
+  memset(read_buf, 0x00, 32);  // Clear buffer first
 
-  printf("\n--- TEST 2: Erase Verification at 0x%08X ---\n", (unsigned int)test_addr);
+  printf("Reading 32 bytes from address 0x00000000...\r\n");
+  status = flash_read(0x00000000, read_buf, 32);
+  printf("Read status: %d (%s)\r\n", status, status == FLASH_DRIVER_OK ? "OK" : "ERROR");
 
-  // Read BEFORE erase
-  printf("Reading BEFORE erase...\n");
-  flash_read(test_addr, data_before, 64);
-  printf("BEFORE: ");
-  for(int i = 0; i < 64; i++) printf("%02X", data_before[i]);
-  printf("\n");
+  if (status == FLASH_DRIVER_OK) {
+      printf("Data: ");
+      for(int i = 0; i < 32; i++) printf("%02X ", read_buf[i]);
+      printf("\r\n");
 
-  // Count non-FF bytes before
-  int non_ff_before = 0;
-  for(int i = 0; i < 64; i++) if(data_before[i] != 0xFF) non_ff_before++;
-  printf("Non-0xFF bytes before: %d\n", non_ff_before);
+      // Check if we got real data (not all zeros or all FFs indicating SPI failure)
+      int all_zero = 1, all_ff = 1;
+      for(int i = 0; i < 32; i++) {
+          if(read_buf[i] != 0x00) all_zero = 0;
+          if(read_buf[i] != 0xFF) all_ff = 0;
+      }
 
-  // ERASE the block
-  printf("\nErasing 64KB block...\n");
-  flash_driver_status_t erase_status = flash_erase_block(test_addr);
-  printf("Erase returned: %d ", erase_status);
-  if (erase_status == FLASH_DRIVER_OK) printf("(OK)\n");
-  else if (erase_status == FLASH_DRIVER_ERROR) printf("(ERROR)\n");
-  else if (erase_status == FLASH_DRIVER_TIMEOUT) printf("(TIMEOUT)\n");
-  else printf("(UNKNOWN)\n");
-
-  // Read AFTER erase
-  printf("\nReading AFTER erase...\n");
-  flash_read(test_addr, data_after, 64);
-  printf("AFTER:  ");
-  for(int i = 0; i < 64; i++) printf("%02X", data_after[i]);
-  printf("\n");
-
-  // Count non-FF bytes after
-  int non_ff_after = 0;
-  for(int i = 0; i < 64; i++) if(data_after[i] != 0xFF) non_ff_after++;
-  printf("Non-0xFF bytes after: %d\n", non_ff_after);
-
-  //==========================================================================
-  // RESULT
-  //==========================================================================
-  printf("\n====================================================\n");
-  printf("                    RESULT\n");
-  printf("====================================================\n");
-  printf("Before erase: %d non-FF bytes\n", non_ff_before);
-  printf("After erase:  %d non-FF bytes\n", non_ff_after);
-
-  if (non_ff_after == 0) {
-      printf("\n*** SUCCESS: Erase WORKED! All bytes are 0xFF ***\n");
-  } else if (non_ff_after < non_ff_before) {
-      printf("\n*** PARTIAL: Some bytes erased, but not all ***\n");
+      if (all_zero) {
+          printf("WARNING: All bytes are 0x00 - possible SPI communication issue\r\n");
+      }
+      printf("TEST %d RESULT: PASS (Read operation completed)\r\n", test_num);
+      tests_passed++;
   } else {
-      printf("\n*** FAILED: Erase did NOT work! Data unchanged ***\n");
+      printf("TEST %d RESULT: FAIL (Read returned error)\r\n", test_num);
+      tests_failed++;
   }
-  printf("====================================================\n");
 
   //==========================================================================
-  // TEST 3: Write Test - Write pattern and verify
+  // TEST 2: SECTOR ERASE TEST (4KB)
   //==========================================================================
-  printf("\n--- TEST 3: Write Test at 0x%08X ---\n", (unsigned int)test_addr);
+  test_num++;
+  printf("\r\n========================================\r\n");
+  printf("TEST %d: SECTOR ERASE OPERATION (4KB)\r\n", test_num);
+  printf("========================================\r\n");
 
-  // Create test pattern (must be word-aligned, 4-byte multiples)
-  uint8_t write_data[16] = {0xDE, 0xAD, 0xBE, 0xEF, 0x12, 0x34, 0x56, 0x78,
-                            0xAA, 0xBB, 0xCC, 0xDD, 0x11, 0x22, 0x33, 0x44};
-  uint8_t read_back[16];
+  uint32_t erase_addr = 0x00010000;  // 64KB offset - safe test area
+  uint8_t verify_buf[64];
 
-  printf("Writing test pattern: ");
+  printf("Target address: 0x%08lX\r\n", (unsigned long)erase_addr);
+
+  // First write some data to ensure sector is not empty
+  printf("Step 1: Writing test pattern before erase...\r\n");
+  uint8_t pre_erase_data[64];
+  for(int i = 0; i < 64; i++) pre_erase_data[i] = (uint8_t)(i ^ 0xAA);
+  flash_erase_sector(erase_addr);  // Erase first to allow write
+  status = flash_write(erase_addr, pre_erase_data, 64);
+  printf("Pre-write status: %d\r\n", status);
+
+  // Verify data was written
+  flash_read(erase_addr, verify_buf, 64);
+  printf("Data before erase: ");
+  for(int i = 0; i < 16; i++) printf("%02X", verify_buf[i]);
+  printf("...\r\n");
+
+  // Count non-0xFF bytes
+  int non_ff_before = 0;
+  for(int i = 0; i < 64; i++) if(verify_buf[i] != 0xFF) non_ff_before++;
+  printf("Non-0xFF bytes before erase: %d\r\n", non_ff_before);
+
+  // NOW ERASE
+  printf("\r\nStep 2: Erasing 4KB sector...\r\n");
+  status = flash_erase_sector(erase_addr);
+  printf("Erase status: %d (%s)\r\n", status,
+         status == FLASH_DRIVER_OK ? "OK" :
+         status == FLASH_DRIVER_TIMEOUT ? "TIMEOUT" : "ERROR");
+
+  // Verify erase
+  printf("\r\nStep 3: Verifying erase (reading back)...\r\n");
+  flash_read(erase_addr, verify_buf, 64);
+  printf("Data after erase:  ");
+  for(int i = 0; i < 16; i++) printf("%02X", verify_buf[i]);
+  printf("...\r\n");
+
+  int non_ff_after = 0;
+  for(int i = 0; i < 64; i++) if(verify_buf[i] != 0xFF) non_ff_after++;
+  printf("Non-0xFF bytes after erase: %d\r\n", non_ff_after);
+
+  if (status == FLASH_DRIVER_OK && non_ff_after == 0) {
+      printf("TEST %d RESULT: PASS (Sector erased to 0xFF)\r\n", test_num);
+      tests_passed++;
+  } else {
+      printf("TEST %d RESULT: FAIL (Erase incomplete or error)\r\n", test_num);
+      tests_failed++;
+  }
+
+  //==========================================================================
+  // TEST 3: WRITE AND VERIFY TEST
+  //==========================================================================
+  test_num++;
+  printf("\r\n========================================\r\n");
+  printf("TEST %d: WRITE AND VERIFY OPERATION\r\n", test_num);
+  printf("========================================\r\n");
+
+  uint32_t write_addr = 0x00020000;  // 128KB offset
+  uint8_t write_data[64];
+  uint8_t read_back[64];
+
+  printf("Target address: 0x%08lX\r\n", (unsigned long)write_addr);
+
+  // Generate pseudo-random test pattern (LFSR)
+  printf("Step 1: Generating 64-byte pseudo-random pattern (LFSR)...\r\n");
+  uint8_t lfsr = 0xAC;  // seed
+  for(int i = 0; i < 64; i++) {
+      write_data[i] = lfsr;
+      uint8_t bit = ((lfsr >> 0) ^ (lfsr >> 2) ^ (lfsr >> 3) ^ (lfsr >> 4)) & 1;
+      lfsr = (lfsr >> 1) | (bit << 7);
+  }
+  printf("Pattern (first 16 bytes): ");
   for(int i = 0; i < 16; i++) printf("%02X", write_data[i]);
-  printf("\n");
+  printf("\r\n");
 
-  // Write to flash
-  flash_driver_status_t write_status = flash_write(test_addr, write_data, 16);
-  printf("Write returned: %d ", write_status);
-  if (write_status == FLASH_DRIVER_OK) printf("(OK)\n");
-  else printf("(ERROR)\n");
+  // Erase sector first
+  printf("\r\nStep 2: Erasing sector before write...\r\n");
+  status = flash_erase_sector(write_addr);
+  printf("Erase status: %d\r\n", status);
 
-  // Read back to verify
-  printf("Reading back...\n");
-  flash_read(test_addr, read_back, 16);
-  printf("Read back:            ");
+  // Write data
+  printf("\r\nStep 3: Writing 64 bytes...\r\n");
+  status = flash_write(write_addr, write_data, 64);
+  printf("Write status: %d (%s)\r\n", status, status == FLASH_DRIVER_OK ? "OK" : "ERROR");
+
+  // Read back
+  printf("\r\nStep 4: Reading back 64 bytes...\r\n");
+  memset(read_back, 0x00, 64);  // Clear buffer
+  flash_read(write_addr, read_back, 64);
+  printf("Read data (first 16 bytes): ");
   for(int i = 0; i < 16; i++) printf("%02X", read_back[i]);
-  printf("\n");
+  printf("\r\n");
 
   // Compare
-  int match = 1;
-  for(int i = 0; i < 16; i++) {
+  printf("\r\nStep 5: Comparing written vs read data...\r\n");
+  int mismatches = 0;
+  for(int i = 0; i < 64; i++) {
       if(write_data[i] != read_back[i]) {
-          match = 0;
-          break;
+          mismatches++;
+          if(mismatches <= 3) {
+              printf("  MISMATCH at byte[%d]: wrote 0x%02X, read 0x%02X\r\n",
+                     i, write_data[i], read_back[i]);
+          }
       }
   }
 
-  if (match) {
-      printf("*** WRITE TEST PASSED: Data matches! ***\n");
+  if (mismatches == 0) {
+      printf("All 64 bytes match!\r\n");
+      printf("TEST %d RESULT: PASS\r\n", test_num);
+      tests_passed++;
   } else {
-      printf("*** WRITE TEST FAILED: Data mismatch! ***\n");
+      printf("Total mismatches: %d out of 64 bytes\r\n", mismatches);
+      printf("TEST %d RESULT: FAIL\r\n", test_num);
+      tests_failed++;
   }
 
   //==========================================================================
-  // TEST 4: Read data area content
+  // TEST 4: BLOCK ERASE TEST (64KB)
   //==========================================================================
-  printf("\n--- TEST 4: Data Area Content ---\n");
-  uint8_t block_sample[32];
-  for(int block = 0; block < 2; block++) {
-      uint32_t addr = 0x00060000 + (block * 0x2000);  // Every 8KB (page size)
-      flash_read(addr, block_sample, 32);
-      printf("0x%08X: ", (unsigned int)addr);
-      for(int i = 0; i < 32; i++) printf("%02X", block_sample[i]);
-      printf("\n");
+  test_num++;
+  printf("\r\n========================================\r\n");
+  printf("TEST %d: BLOCK ERASE OPERATION (64KB)\r\n", test_num);
+  printf("========================================\r\n");
+
+  uint32_t block_addr = 0x00030000;  // 192KB offset
+
+  printf("Target address: 0x%08lX\r\n", (unsigned long)block_addr);
+
+  // Write data at start and end of block to verify full block erase
+  printf("Step 1: Writing markers at block boundaries...\r\n");
+  uint8_t marker[4] = {0xDE, 0xAD, 0xBE, 0xEF};
+
+  // Erase first to allow writes
+  flash_erase_block(block_addr);
+
+  flash_write(block_addr, marker, 4);
+  flash_write(block_addr + 0xFFFC, marker, 4);  // End of 64KB block
+
+  // Verify markers written
+  uint8_t check[4];
+  flash_read(block_addr, check, 4);
+  printf("Marker at start: %02X%02X%02X%02X\r\n", check[0], check[1], check[2], check[3]);
+  flash_read(block_addr + 0xFFFC, check, 4);
+  printf("Marker at end:   %02X%02X%02X%02X\r\n", check[0], check[1], check[2], check[3]);
+
+  // Erase 64KB block
+  printf("\r\nStep 2: Erasing 64KB block...\r\n");
+  status = flash_erase_block(block_addr);
+  printf("Block erase status: %d (%s)\r\n", status,
+         status == FLASH_DRIVER_OK ? "OK" :
+         status == FLASH_DRIVER_TIMEOUT ? "TIMEOUT" : "ERROR");
+
+  // Verify both markers are erased
+  printf("\r\nStep 3: Verifying block erased...\r\n");
+  flash_read(block_addr, check, 4);
+  printf("Start after erase: %02X%02X%02X%02X\r\n", check[0], check[1], check[2], check[3]);
+  int start_ok = (check[0]==0xFF && check[1]==0xFF && check[2]==0xFF && check[3]==0xFF);
+
+  flash_read(block_addr + 0xFFFC, check, 4);
+  printf("End after erase:   %02X%02X%02X%02X\r\n", check[0], check[1], check[2], check[3]);
+  int end_ok = (check[0]==0xFF && check[1]==0xFF && check[2]==0xFF && check[3]==0xFF);
+
+  if (status == FLASH_DRIVER_OK && start_ok && end_ok) {
+      printf("TEST %d RESULT: PASS (Full 64KB block erased)\r\n", test_num);
+      tests_passed++;
+  } else {
+      printf("TEST %d RESULT: FAIL\r\n", test_num);
+      tests_failed++;
   }
-  printf("====================================================\n");
+
+  //==========================================================================
+  // TEST 5: HIGH ADDRESS TEST (4-byte addressing verification)
+  //==========================================================================
+  test_num++;
+  printf("\r\n========================================\r\n");
+  printf("TEST %d: HIGH ADDRESS TEST (4-byte mode)\r\n", test_num);
+  printf("========================================\r\n");
+
+  // Test addresses beyond 16MB require 4-byte addressing
+  uint32_t high_addresses[] = {
+      0x00100000,   // 1MB
+      0x01000000,   // 16MB (boundary of 3-byte addressing)
+      0x02000000,   // 32MB
+      0x03000000    // 48MB
+  };
+  const char* addr_names[] = {"1MB", "16MB", "32MB", "48MB"};
+  int high_addr_tests = sizeof(high_addresses) / sizeof(high_addresses[0]);
+  int high_addr_passed = 0;
+
+  for(int t = 0; t < high_addr_tests; t++) {
+      uint32_t addr = high_addresses[t];
+      uint8_t test_pattern[8] = {0xCA, 0xFE, 0xBA, 0xBE, 0x12, 0x34, 0x56, 0x78};
+      uint8_t readback[8] = {0};
+
+      printf("\r\nTesting %s (0x%08lX):\r\n", addr_names[t], (unsigned long)addr);
+
+      // Erase, write, read, verify
+      flash_erase_sector(addr);
+      flash_write(addr, test_pattern, 8);
+      flash_read(addr, readback, 8);
+
+      printf("  Wrote: ");
+      for(int i = 0; i < 8; i++) printf("%02X", test_pattern[i]);
+      printf("\r\n  Read:  ");
+      for(int i = 0; i < 8; i++) printf("%02X", readback[i]);
+      printf("\r\n");
+
+      int match = 1;
+      for(int i = 0; i < 8; i++) {
+          if(test_pattern[i] != readback[i]) match = 0;
+      }
+
+      if(match) {
+          printf("  Result: PASS\r\n");
+          high_addr_passed++;
+      } else {
+          printf("  Result: FAIL\r\n");
+      }
+  }
+
+  if (high_addr_passed == high_addr_tests) {
+      printf("\r\nTEST %d RESULT: PASS (All %d addresses verified)\r\n", test_num, high_addr_tests);
+      tests_passed++;
+  } else {
+      printf("\r\nTEST %d RESULT: FAIL (%d/%d addresses failed)\r\n",
+             test_num, high_addr_tests - high_addr_passed, high_addr_tests);
+      tests_failed++;
+  }
+
+  //==========================================================================
+  // TEST 6: PAGE BOUNDARY WRITE TEST
+  //==========================================================================
+  test_num++;
+  printf("\r\n========================================\r\n");
+  printf("TEST %d: PAGE BOUNDARY WRITE (256 bytes)\r\n", test_num);
+  printf("========================================\r\n");
+
+  uint32_t page_addr = 0x00040000;  // 256KB offset
+  uint8_t page_data[256];
+  uint8_t page_verify[256];
+
+  printf("Target address: 0x%08lX\r\n", (unsigned long)page_addr);
+  printf("Writing full 256-byte page...\r\n");
+
+  // Generate pattern
+  for(int i = 0; i < 256; i++) {
+      page_data[i] = (uint8_t)i;  // Sequential pattern 0x00-0xFF
+  }
+
+  // Erase and write
+  flash_erase_sector(page_addr);
+  status = flash_write(page_addr, page_data, 256);
+  printf("Write status: %d\r\n", status);
+
+  // Read back
+  flash_read(page_addr, page_verify, 256);
+
+  // Verify
+  int page_errors = 0;
+  for(int i = 0; i < 256; i++) {
+      if(page_data[i] != page_verify[i]) page_errors++;
+  }
+
+  printf("First 16 bytes: ");
+  for(int i = 0; i < 16; i++) printf("%02X", page_verify[i]);
+  printf("\r\n");
+  printf("Last 16 bytes:  ");
+  for(int i = 240; i < 256; i++) printf("%02X", page_verify[i]);
+  printf("\r\n");
+
+  if (status == FLASH_DRIVER_OK && page_errors == 0) {
+      printf("TEST %d RESULT: PASS (All 256 bytes verified)\r\n", test_num);
+      tests_passed++;
+  } else {
+      printf("TEST %d RESULT: FAIL (%d errors)\r\n", test_num, page_errors);
+      tests_failed++;
+  }
+
+  //==========================================================================
+  // FINAL SUMMARY
+  //==========================================================================
+  printf("\r\n");
+  printf("########################################################\r\n");
+  printf("#                  TEST SUMMARY                        #\r\n");
+  printf("########################################################\r\n");
+  printf("\r\n");
+  printf("  Total Tests:  %d\r\n", test_num);
+  printf("  Passed:       %d\r\n", tests_passed);
+  printf("  Failed:       %d\r\n", tests_failed);
+  printf("\r\n");
+
+  if (tests_failed == 0) {
+      printf("  *** ALL TESTS PASSED! ***\r\n");
+      printf("  Flash driver is fully operational.\r\n");
+  } else {
+      printf("  *** SOME TESTS FAILED ***\r\n");
+      printf("  Check hardware connections and flash chip.\r\n");
+  }
+
+  printf("\r\n");
+  printf("########################################################\r\n");
 }
 
 /**************************************************************************//**

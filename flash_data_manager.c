@@ -74,7 +74,7 @@ void flash_data_manager_init(void)
 /***************************************************************************//**
  * @brief Adds a new sensor data sample to the current block.
  ******************************************************************************/
-/*bool flash_data_manager_add_sample(sensor_data_t *sample)
+bool flash_data_manager_add_sample(sensor_data_t *sample)
 {
     if (!g_initialized || !sample) {
         return false;
@@ -92,12 +92,12 @@ void flash_data_manager_init(void)
     }
 
     return true;
-}*/
+}
 
 /***************************************************************************//**
  * @brief Writes the current data block to flash memory.
  ******************************************************************************/
-/*bool flash_data_manager_flush_block(void)
+bool flash_data_manager_flush_block(void)
 {
     if (!g_initialized || g_sample_index == 0) {
         return false; // Nothing to flush
@@ -151,17 +151,18 @@ void flash_data_manager_init(void)
     memset(&g_current_block, 0, sizeof(flash_data_block_t));
     g_sample_index = 0;
 
-    printf("Flash Data Manager: Block %lu written successfully to 0x%x.\n", (unsigned long)g_header.total_blocks - 1, g_header.write_pointer-sizeof(flash_data_block_t));
+    printf("Flash Data Manager: Block %lu written successfully to 0x%lX.\n", (unsigned long)g_header.total_blocks - 1, (unsigned long)(g_header.write_pointer-sizeof(flash_data_block_t)));
     return true;
-}*?
+}
 
 /***************************************************************************//**
  * @brief Writes the header to flash memory.
  ******************************************************************************/
 static void write_header_to_flash(void)
 {
-    /* FIX: Was inverted - should return if NOT initialized */
-    if (!g_initialized) return;
+    /* Note: No g_initialized check here - this function is called during init
+     * to write the initial header, before g_initialized is set to true.
+     * Callers are responsible for ensuring flash_driver is initialized. */
 
     g_header.crc32 = 0; // CRC calculation would go here if implemented
     flash_erase_sector(FLASH_HEADER_ADDR);
@@ -232,10 +233,10 @@ bool flash_data_manager_erase_all(void) {
     for(uint32_t erase_address = FLASH_HEADER_ADDR; erase_address < FLASH_DATA_END; erase_address += 0x10000){
         flash_driver_status_t status = flash_erase_block(erase_address);
         if (status != FLASH_DRIVER_OK) {
-            printf("ERROR: Erase failed at 0x%x (status=%d)\n", (uint32_t)erase_address, status);
+            printf("ERROR: Erase failed at 0x%lX (status=%d)\n", (unsigned long)erase_address, status);
             return false;
         }
-        printf("Erased 64Kb at 0x%x\n", (uint32_t)erase_address);
+        printf("Erased 64KB at 0x%lX\n", (unsigned long)erase_address);
     }
 
     /* Reset header to initial state */
