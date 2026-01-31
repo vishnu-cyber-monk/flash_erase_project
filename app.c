@@ -28,6 +28,7 @@
  *
  ******************************************************************************/
 #include <stdio.h>
+#include <string.h>
 #include "em_common.h"
 #include "app_assert.h"
 #include "sl_bluetooth.h"
@@ -255,6 +256,9 @@ SL_WEAK void app_init(void)
   EMU->CTRL_SET = EMU_CTRL_EM2DBGEN;
   #endif
   #endif
+
+  // Wait for RTT console to connect before starting tests
+  sl_sleeptimer_delay_millisecond(2000);
 
   // Initialize flash driver
   printf("\r\n\r\n");
